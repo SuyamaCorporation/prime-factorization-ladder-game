@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>素因数分解 階段 ゲーム</title>
+<script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50 min-h-screen">
+<div class="max-w-xl mx-auto p-4">
+  <h1 class="text-2xl font-bold text-gray-800 mb-1">素因数分解 階段 ゲーム</h1>
+  <p class="text-sm text-gray-500 mb-4">素数ボタンで割り切って1になるまで進めよう！</p>
+
+  <!-- 設定 -->
+  <div id="settings-area" class="bg-white rounded-xl shadow-md p-5 mb-4">
+    <h2 class="text-sm font-semibold text-gray-500 uppercase mb-3">難易度（数の範囲）</h2>
+    <div class="grid grid-cols-3 gap-2 mb-4">
+      <label class="text-center">
+        <input type="radio" name="difficulty" value="easy" checked class="sr-only peer">
+        <div class="peer-checked:bg-blue-500 peer-checked:text-white bg-gray-100 text-gray-600 rounded-lg p-3 text-sm font-medium cursor-pointer hover:bg-gray-200 transition-colors" aria-label="初級100-999">初級<div class="text-xs opacity-70">100〜999</div></div>
+      </label>
+      <label class="text-center">
+        <input type="radio" name="difficulty" value="medium" class="sr-only peer">
+        <div class="peer-checked:bg-blue-500 peer-checked:text-white bg-gray-100 text-gray-600 rounded-lg p-3 text-sm font-medium cursor-pointer hover:bg-gray-200 transition-colors" aria-label="中級1000-3999">中級<div class="text-xs opacity-70">1000〜3999</div></div>
+      </label>
+      <label class="text-center">
+        <input type="radio" name="difficulty" value="hard" class="sr-only peer">
+        <div class="peer-checked:bg-blue-500 peer-checked:text-white bg-gray-100 text-gray-600 rounded-lg p-3 text-sm font-medium cursor-pointer hover:bg-gray-200 transition-colors" aria-label="上級4000-9999">上級<div class="text-xs opacity-70">4000〜9999</div></div>
+      </label>
+    </div>
+    <button onclick="startGame()" aria-label="ゲーム開始"
+      class="w-full py-3 bg-blue-600 text-white rounded-lg font-bold text-lg hover:bg-blue-700 transition-colors">
+      ゲーム開始
+    </button>
+  </div>
+
+  <!-- ゲームエリア -->
+  <div id="game-area" class="hidden">
+    <!-- 対象数 -->
+    <div class="bg-white rounded-xl shadow-md p-5 mb-4 text-center">
+      <div class="text-xs text-gray-400 mb-1">この数を素因数分解せよ！</div>
+      <div id="target-number" class="text-5xl font-bold text-blue-600 mb-2 font-mono"></div>
+      <div class="flex justify-center gap-4 text-sm text-gray-400">
+        <span>ステップ: <span id="step-count" class="font-bold text-gray-600">0</span></span>
+        <span>エラー: <span id="error-count" class="font-bold text-red-500">0</span></span>
+      </div>
+    </div>
+
+    <!-- 現在の値 -->
+    <div class="bg-blue-50 rounded-xl border border-blue-200 p-4 mb-4 text-center">
+      <div class="text-sm text-blue-500 mb-1">現在の値</div>
+      <div id="current-value" class="text-4xl font-bold text-blue-700 font-mono"></div>
+    </div>
+
+    <!-- 素数ボタン -->
+    <div class="bg-white rounded-xl shadow-md p-4 mb-4">
+      <p class="text-sm text-gray-500 mb-3">割る素数を選んでください</p>
+      <div id="prime-buttons" class="flex flex-wrap gap-2"></div>
+    </div>
+
+    <!-- エラーメッセージ -->
+    <div id="error-msg" class="hidden bg-red-50 border border-red-200 rounded-lg p-3 mb-4 text-sm text-red-700 text-center"></div>
+
+    <!-- ラダー図 -->
+    <div class="bg-white rounded-xl shadow-md p-4 mb-4">
+      <h2 class="text-sm font-semibold text-gray-500 uppercase mb-3">ラダー図</h2>
+      <div id="ladder-display" class="font-mono text-sm space-y-1"></div>
+    </div>
+
+    <!-- コントロール -->
+    <div class="flex gap-2 mb-4">
+      <button onclick="undoStep()" aria-label="1手戻す"
+        class="flex-1 py-2 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200 text-sm">
+        ↩ 1手戻す
+      </button>
+      <button onclick="startGame()" aria-label="新しい問題"
+        class="flex-1 py-2 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200 text-sm">
+        🔄 新しい問題
+      </button>
+    </div>
+
+    <!-- クリア画面 -->
+    <div id="clear-area" class="hidden bg-white rounded-xl shadow-md p-5 text-center">
+      <div class="text-4xl mb-3">🎉</div>
+      <div class="text-xl font-bold text-green-600 mb-2">完成！</div>
+      <div id="factorization-result" class="text-lg font-mono text-gray-700 mb-3"></div>
+      <div id="score-display" class="text-2xl font-bold text-blue-600 mb-2"></div>
+      <div id="prime-fact" class="text-sm text-gray-500 mb-4 italic"></div>
+      <button onclick="startGame()" aria-label="次の問題"
+        class="px-6 py-2 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700">
+        次の問題
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+function escapeHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+const PRIMES = [2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37];
+
+const PRIME_FACTS = [
+  '2は唯一の偶数の素数です。',
+  '3の倍数は各桁の数字の和が3の倍数になります。',
+  '5で割り切れる数は必ず0か5で終わります。',
+  '7は「7の倍数チェック」が特に複雑な素数として知られています。',
+  '11の倍数は交互の桁の差が11の倍数になります。（例: 121→1-2+1=0）',
+  '13は13番目の素数ではなく6番目の素数です。',
+  '17は「ラッキープライム」とも呼ばれることがあります。',
+  '19を超える素数はすべて1か9で終わります。（正確には1,3,7,9のいずれか）',
+  '23は双子素数（23, 29）の仲間です。',
+  '29は「セーフプライム」の一例として研究されています。',
+  '31と37は双子素数ペアです（差が6の素数ペア）。',
+  '37×3=111と覚えると便利です。',
+  '素因数分解の基本定理：全ての自然数は素数の積として一意に表せます。',
+  '1は素数ではありません。素数の定義は「1より大きく、自分と1だけで割り切れる数」です。',
+  '100以下の素数は25個あります（2,3,5,...,97）。',
+];
+
+let targetNum = 0;
+let currentVal = 0;
+let steps = []; // [{divisor, quotient}]
+let errorCount = 0;
+let difficulty = 'easy';
+
+function getRange() {
+  switch(difficulty) {
+    case 'easy': return [100, 999];
+    case 'medium': return [1000, 3999];
+    case 'hard': return [4000, 9999];
+    default: return [100, 999];
+  }
+}
+
+// 素因数分解が「面白い」数を生成（ランダム・ただし最大の素因数が37以下）
+function generateNumber() {
+  const [min, max] = getRange();
+  let tries = 0;
+  while (tries < 200) {
+    tries++;
+    const n = Math.floor(Math.random() * (max - min + 1)) + min;
+    // 最大の素因数が37以下かチェック
+    let temp = n;
+    let valid = true;
+    for (const p of PRIMES) {
+      while (temp % p === 0) { temp = temp / p; }
+    }
+    if (temp > 1) valid = false; // 37より大きい素因数が存在
+    if (valid) return n;
+  }
+  return 360; // フォールバック
+}
+
+function startGame() {
+  difficulty = document.querySelector('input[name="difficulty"]:checked').value;
+  targetNum = generateNumber();
+  currentVal = targetNum;
+  steps = [];
+  errorCount = 0;
+
+  document.getElementById('settings-area').classList.remove('hidden');
+  document.getElementById('game-area').classList.remove('hidden');
+  document.getElementById('clear-area').classList.add('hidden');
+  document.getElementById('error-msg').classList.add('hidden');
+
+  document.getElementById('target-number').textContent = targetNum;
+  document.getElementById('current-value').textContent = currentVal;
+  document.getElementById('step-count').textContent = 0;
+  document.getElementById('error-count').textContent = 0;
+  document.getElementById('ladder-display').innerHTML = '';
+
+  renderPrimeButtons();
+}
+
+function renderPrimeButtons() {
+  const container = document.getElementById('prime-buttons');
+  container.innerHTML = '';
+  PRIMES.forEach(p => {
+    const btn = document.createElement('button');
+    btn.setAttribute('aria-label', p + 'で割る');
+    const divisible = currentVal % p === 0;
+    btn.className = 'px-4 py-2 rounded-lg font-bold font-mono text-lg transition-all ' +
+      (divisible
+        ? 'bg-blue-100 text-blue-700 hover:bg-blue-200 border-2 border-blue-300'
+        : 'bg-gray-100 text-gray-400 border-2 border-gray-200 cursor-not-allowed');
+    btn.textContent = p;
+    btn.disabled = !divisible;
+    if (divisible) {
+      btn.onclick = () => divideBy(p);
+    }
+    container.appendChild(btn);
+  });
+}
+
+function divideBy(p) {
+  if (currentVal % p !== 0) {
+    showError(p + 'は' + currentVal + 'を割り切れません');
+    errorCount++;
+    document.getElementById('error-count').textContent = errorCount;
+    return;
+  }
+
+  const quotient = currentVal / p;
+  steps.push({ divisor: p, quotient, from: currentVal });
+  currentVal = quotient;
+
+  document.getElementById('current-value').textContent = currentVal;
+  document.getElementById('step-count').textContent = steps.length;
+  document.getElementById('error-msg').classList.add('hidden');
+
+  renderLadder();
+  renderPrimeButtons();
+
+  if (currentVal === 1) {
+    showClear();
+  }
+}
+
+function showError(msg) {
+  const el = document.getElementById('error-msg');
+  el.textContent = msg;
+  el.classList.remove('hidden');
+  setTimeout(() => el.classList.add('hidden'), 2000);
+}
+
+function undoStep() {
+  if (steps.length === 0) return;
+  const last = steps.pop();
+  currentVal = last.from;
+  document.getElementById('current-value').textContent = currentVal;
+  document.getElementById('step-count').textContent = steps.length;
+  renderLadder();
+  renderPrimeButtons();
+}
+
+function renderLadder() {
+  const container = document.getElementById('ladder-display');
+  container.innerHTML = '';
+
+  steps.forEach((s, i) => {
+    const row = document.createElement('div');
+    row.className = 'flex items-center gap-1 text-gray-700';
+    const divisorSpan = document.createElement('span');
+    divisorSpan.className = 'text-blue-600 font-bold w-6 text-right';
+    divisorSpan.textContent = s.divisor;
+    const bar = document.createElement('span');
+    bar.className = 'text-gray-400';
+    bar.textContent = ' │ ';
+    const fromSpan = document.createElement('span');
+    fromSpan.className = 'text-gray-800 w-8';
+    fromSpan.textContent = s.from;
+    const arrow = document.createElement('span');
+    arrow.className = 'text-gray-400 mx-1';
+    arrow.textContent = '→';
+    const toSpan = document.createElement('span');
+    toSpan.className = i === steps.length - 1 ? 'font-bold text-green-600' : 'text-gray-600';
+    toSpan.textContent = s.quotient;
+    row.appendChild(divisorSpan);
+    row.appendChild(bar);
+    row.appendChild(fromSpan);
+    row.appendChild(arrow);
+    row.appendChild(toSpan);
+    container.appendChild(row);
+  });
+}
+
+function showClear() {
+  document.getElementById('clear-area').classList.remove('hidden');
+
+  // 素因数分解式を構築
+  const factors = {};
+  steps.forEach(s => {
+    factors[s.divisor] = (factors[s.divisor] || 0) + 1;
+  });
+  const factorStr = Object.entries(factors)
+    .map(([p, exp]) => exp === 1 ? p : p + '^' + exp)
+    .join(' × ');
+  document.getElementById('factorization-result').textContent =
+    targetNum + ' = ' + factorStr;
+
+  // スコア計算（ステップ数が少ないほど高得点）
+  const optimalSteps = getOptimalSteps(targetNum);
+  const baseScore = 1000;
+  const penalty = Math.max(0, steps.length - optimalSteps) * 50 + errorCount * 30;
+  const score = Math.max(0, baseScore - penalty);
+  document.getElementById('score-display').textContent = score + 'pts';
+
+  // 素数の豆知識
+  const fact = PRIME_FACTS[Math.floor(Math.random() * PRIME_FACTS.length)];
+  document.getElementById('prime-fact').textContent = '豆知識: ' + fact;
+}
+
+function getOptimalSteps(n) {
+  let count = 0;
+  let temp = n;
+  for (const p of PRIMES) {
+    while (temp % p === 0) { temp = temp / p; count++; }
+  }
+  return count;
+}
+
+// キーボードショートカット（2,3,5,7,1,9のキーに対応）
+document.addEventListener('keydown', e => {
+  const key = e.key;
+  const pMap = {'2':2,'3':3,'5':5,'7':7};
+  if (pMap[key]) {
+    const p = pMap[key];
+    if (currentVal % p === 0 && currentVal > 1) divideBy(p);
+  }
+});
+</script>
+</body>
+</html>
